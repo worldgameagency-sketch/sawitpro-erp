@@ -1,0 +1,6 @@
+{
+  "name": "SawitPRO - ERP Operasional Kebun Sawit",
+  "description": "Aplikasi PWA mobile-first untuk pencatatan panen, upah pemanen & sopir, pemupukan, biaya operasional, dan ringkasan laba kebun sawit.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

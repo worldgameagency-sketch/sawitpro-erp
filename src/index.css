@@ -1,0 +1,29 @@
+@import "tailwindcss";
+
+@layer base {
+  html, body {
+    @apply bg-stone-100 text-stone-900 antialiased selection:bg-emerald-600 selection:text-white;
+    -webkit-tap-highlight-color: transparent;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  /* Prevent awkward zooming on inputs in iOS Safari */
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Custom utility for safe area padding on mobile devices */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 1rem);
+}
+
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 0.5rem);
+}
+
+/* Touch friendly minimum target */
+.touch-target {
+  min-height: 48px;
+  min-width: 48px;
+}

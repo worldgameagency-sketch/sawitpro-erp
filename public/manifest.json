@@ -1,0 +1,19 @@
+{
+  "name": "SawitPRO - ERP Operasional Sawit",
+  "short_name": "SawitPRO",
+  "description": "Aplikasi PWA mobile-first untuk pencatatan panen, upah pekerja, biaya operasional, dan hasil laba kebun sawit.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#052e16",
+  "theme_color": "#14532d",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "productivity", "agriculture"]
+}
