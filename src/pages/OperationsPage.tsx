@@ -80,8 +80,8 @@ export const OperationsPage: React.FC = () => {
       category: expCategory,
       amount,
       description: expDesc.trim(),
-      recipientName: expRecipient.trim() || undefined,
-    });
+      recipient: expRecipient.trim() || undefined,
+    } as any);
 
     setExpAmount('');
     setExpDesc('');
@@ -101,16 +101,16 @@ export const OperationsPage: React.FC = () => {
       farmId: fertFarmId,
       farmName: farm?.name || 'Kebun Sawit',
       blockId: fertBlockId || undefined,
-      blockName: block?.blockName || undefined,
-      fertilizerName: fertName.trim(),
+      blockName: block?.name || undefined,
+      fertilizerType: fertName.trim(),
       quantity: numQty,
       unit: fertUnit,
-      pricePerUnit: numPrice,
+      unitPrice: numPrice,
       materialCost,
       workerName: fertWorkerName.trim() || undefined,
       laborCost: numLabor,
       totalCost: totalFertCost,
-    });
+    } as any);
 
     setIsFertModalOpen(false);
   };
@@ -193,6 +193,9 @@ export const OperationsPage: React.FC = () => {
             filteredExpenses.map((exp) => {
               const badge = getCategoryBadge(exp.category);
               const BadgeIcon = badge.icon;
+              // Mencari nama kebun secara aman berdasarkan farmId
+              const matchedFarm = farms.find(f => f.id === exp.farmId);
+              const farmDisplayName = exp.farmName || matchedFarm?.name || 'Kebun Sawit';
 
               return (
                 <Card key={exp.id} className="p-3.5">
@@ -207,7 +210,7 @@ export const OperationsPage: React.FC = () => {
                       </div>
                       <h4 className="font-bold text-sm text-stone-900 mt-1.5">{exp.description}</h4>
                       <p className="text-xs text-stone-500 mt-0.5">
-                        Kebun: {exp.farmName} {exp.recipientName && `• Penerima: ${exp.recipientName}`}
+                        Kebun: {farmDisplayName} {exp.recipient && `• Penerima: ${exp.recipient}`}
                       </p>
                     </div>
 
@@ -240,53 +243,61 @@ export const OperationsPage: React.FC = () => {
               <p className="text-xs text-stone-400 mt-1">Catat pembelian pupuk dan upah sebar tenaga kerja di sini.</p>
             </Card>
           ) : (
-            filteredFertilizations.map((fert) => (
-              <Card key={fert.id} className="p-3.5 border-l-4 border-l-emerald-600">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="bg-emerald-100 text-emerald-800 text-[11px] font-bold px-2 py-0.5 rounded">
-                        {fert.fertilizerName}
-                      </span>
-                      <span className="text-xs text-stone-400">{formatDateIndo(fert.date)}</span>
+            filteredFertilizations.map((fert) => {
+              // Mencari nama kebun & blok secara aman berdasarkan ID
+              const matchedFarm = farms.find(f => f.id === fert.farmId);
+              const matchedBlock = blocks.find(b => b.id === fert.blockId);
+              const farmDisplayName = fert.farmName || matchedFarm?.name || 'Kebun Sawit';
+              const blockDisplayName = fert.blockName || matchedBlock?.name;
+
+              return (
+                <Card key={fert.id} className="p-3.5 border-l-4 border-l-emerald-600">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="bg-emerald-100 text-emerald-800 text-[11px] font-bold px-2 py-0.5 rounded">
+                          {fert.fertilizerType}
+                        </span>
+                        <span className="text-xs text-stone-400">{formatDateIndo(fert.date)}</span>
+                      </div>
+                      <p className="text-xs text-stone-600 font-semibold mt-1">
+                        {farmDisplayName} {blockDisplayName && `(${blockDisplayName})`}
+                      </p>
+                      <p className="text-xs text-stone-500">
+                        Jumlah: {fert.quantity} {fert.unit} @ {formatRupiah(fert.unitPrice)}
+                      </p>
                     </div>
-                    <p className="text-xs text-stone-600 font-semibold mt-1">
-                      {fert.farmName} {fert.blockName && `(${fert.blockName})`}
-                    </p>
-                    <p className="text-xs text-stone-500">
-                      Jumlah: {fert.quantity} {fert.unit} @ {formatRupiah(fert.pricePerUnit)}
-                    </p>
+
+                    <div className="text-right">
+                      <span className="text-xs text-stone-500 block">Total Biaya</span>
+                      <span className="font-black text-sm sm:text-base text-rose-600">
+                        - {formatRupiah(fert.totalCost)}
+                      </span>
+                      <button
+                        onClick={() => setDeleteTarget({ type: 'fert', id: fert.id })}
+                        className="block ml-auto mt-2 text-stone-400 hover:text-red-600 p-1"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
 
-                  <div className="text-right">
-                    <span className="text-xs text-stone-500 block">Total Biaya</span>
-                    <span className="font-black text-sm sm:text-base text-rose-600">
-                      - {formatRupiah(fert.totalCost)}
-                    </span>
-                    <button
-                      onClick={() => setDeleteTarget({ type: 'fert', id: fert.id })}
-                      className="block ml-auto mt-2 text-stone-400 hover:text-red-600 p-1"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                  {/* Pemisahan Biaya Material vs Upah Tenaga Kerja */}
+                  <div className="mt-2.5 pt-2 border-t border-stone-100 grid grid-cols-2 gap-2 text-xs bg-stone-50 p-2 rounded-xl">
+                    <div>
+                      <span className="text-[10px] text-stone-500 block">Biaya Pupuk (Material):</span>
+                      <span className="font-bold text-stone-800">{formatRupiah(fert.materialCost)}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] text-stone-500 block">
+                        Biaya Upah Sebar {fert.workerName ? `(${fert.workerName})` : ''}:
+                      </span>
+                      <span className="font-bold text-stone-800">{formatRupiah(fert.laborCost)}</span>
+                    </div>
                   </div>
-                </div>
-
-                {/* Pemisahan Biaya Material vs Upah Tenaga Kerja */}
-                <div className="mt-2.5 pt-2 border-t border-stone-100 grid grid-cols-2 gap-2 text-xs bg-stone-50 p-2 rounded-xl">
-                  <div>
-                    <span className="text-[10px] text-stone-500 block">Biaya Pupuk (Material):</span>
-                    <span className="font-bold text-stone-800">{formatRupiah(fert.materialCost)}</span>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-[10px] text-stone-500 block">
-                      Biaya Upah Sebar {fert.workerName ? `(${fert.workerName})` : ''}:
-                    </span>
-                    <span className="font-bold text-stone-800">{formatRupiah(fert.laborCost)}</span>
-                  </div>
-                </div>
-              </Card>
-            ))
+                </Card>
+              );
+            })
           )}
         </div>
       )}
@@ -433,7 +444,7 @@ export const OperationsPage: React.FC = () => {
               >
                 <option value="">-- Semua Blok / Tidak spesifik --</option>
                 {currentFarmBlocks.map((b) => (
-                  <option key={b.id} value={b.id}>{b.blockName} ({b.areaHa} ha)</option>
+                  <option key={b.id} value={b.id}>{b.name} ({b.areaHa} ha)</option>
                 ))}
               </select>
             </div>

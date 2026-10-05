@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { Header } from './components/layout/Header';
 import { BottomNav } from './components/layout/BottomNav';
@@ -14,6 +14,8 @@ import { OperationsPage } from './pages/OperationsPage';
 import { WorkersPage } from './pages/WorkersPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { FarmsPage } from './pages/FarmsPage';
+import { Auth } from './components/Auth';
+import { supabase } from './lib/supabaseClient';
 
 const MainContent: React.FC = () => {
   const { activeTab } = useApp();
@@ -44,6 +46,44 @@ const MainContent: React.FC = () => {
 };
 
 export default function App() {
+  const [session, setSession] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!supabase) {
+      setLoading(false);
+      return;
+    }
+
+    // Ambil sesi aktif saat pertama buka aplikasi
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setLoading(false);
+    });
+
+    // Listener kalau user login / logout
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white">
+        <p>Memuat sesi aplikasi...</p>
+      </div>
+    );
+  }
+
+  // Jika belum login, tampilkan halaman Auth
+  if (!session) {
+    return <Auth />;
+  }
+
+  // Jika sudah login, tampilkan aplikasi ERP seperti biasa
   return (
     <AppProvider>
       <MainContent />

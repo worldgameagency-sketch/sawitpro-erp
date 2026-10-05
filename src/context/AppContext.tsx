@@ -9,14 +9,6 @@ import {
   DateFilterType, 
   DashboardMetrics 
 } from '../types';
-import { 
-  INITIAL_FARMS, 
-  INITIAL_BLOCKS, 
-  INITIAL_WORKERS, 
-  INITIAL_HARVESTS, 
-  INITIAL_FERTILIZATIONS, 
-  INITIAL_EXPENSES 
-} from '../lib/demoData';
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
 
 export type ActiveTab = 'dashboard' | 'panen' | 'operasional' | 'pekerja' | 'laporan' | 'kebun';
@@ -89,52 +81,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [dateFilter, setDateFilter] = useState<DateFilterType>('month');
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
   const today = new Date();
   const firstDay = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
   const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0];
   const [customStartDate, setCustomStartDate] = useState<string>(firstDay);
   const [customEndDate, setCustomEndDate] = useState<string>(lastDay);
 
-  // Data States (Default menggunakan LocalStorage/Demo agar tidak langsung kosong saat di-refresh)
-  const [farms, setFarms] = useState<Farm[]>(() => {
-    const saved = localStorage.getItem('sawit_farms');
-    return saved ? JSON.parse(saved) : INITIAL_FARMS;
-  });
-  const [blocks, setBlocks] = useState<FarmBlock[]>(() => {
-    const saved = localStorage.getItem('sawit_blocks');
-    return saved ? JSON.parse(saved) : INITIAL_BLOCKS;
-  });
-  const [workers, setWorkers] = useState<Worker[]>(() => {
-    const saved = localStorage.getItem('sawit_workers');
-    return saved ? JSON.parse(saved) : INITIAL_WORKERS;
-  });
-  const [harvests, setHarvests] = useState<HarvestTransaction[]>(() => {
-    const saved = localStorage.getItem('sawit_harvests');
-    return saved ? JSON.parse(saved) : INITIAL_HARVESTS;
-  });
-  const [fertilizations, setFertilizations] = useState<FertilizationRecord[]>(() => {
-    const saved = localStorage.getItem('sawit_fertilizations');
-    return saved ? JSON.parse(saved) : INITIAL_FERTILIZATIONS;
-  });
-  const [expenses, setExpenses] = useState<ExpenseRecord[]>(() => {
-    const saved = localStorage.getItem('sawit_expenses');
-    return saved ? JSON.parse(saved) : INITIAL_EXPENSES;
-  });
+  // Data States
+  const [farms, setFarms] = useState<Farm[]>([]);
+  const [blocks, setBlocks] = useState<FarmBlock[]>([]);
+  const [workers, setWorkers] = useState<Worker[]>([]);
+  const [harvests, setHarvests] = useState<HarvestTransaction[]>([]);
+  const [fertilizations, setFertilizations] = useState<FertilizationRecord[]>([]);
+  const [expenses, setExpenses] = useState<ExpenseRecord[]>([]);
 
-  // Simpan otomatis ke localStorage sebagai backup offline
-  useEffect(() => { localStorage.setItem('sawit_farms', JSON.stringify(farms)); }, [farms]);
-  useEffect(() => { localStorage.setItem('sawit_blocks', JSON.stringify(blocks)); }, [blocks]);
-  useEffect(() => { localStorage.setItem('sawit_workers', JSON.stringify(workers)); }, [workers]);
-  useEffect(() => { localStorage.setItem('sawit_harvests', JSON.stringify(harvests)); }, [harvests]);
-  useEffect(() => { localStorage.setItem('sawit_fertilizations', JSON.stringify(fertilizations)); }, [fertilizations]);
-  useEffect(() => { localStorage.setItem('sawit_expenses', JSON.stringify(expenses)); }, [expenses]);
+  // Get Current User Auth Session on Mount
+  useEffect(() => {
+    const checkUser = async () => {
+      if (!isSupabaseConfigured || !supabase) return;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        setCurrentUserId(session.user.id);
+      }
+    };
+    checkUser();
+  }, []);
 
-  // Fetch Data from Supabase on mount with mapping
+  // Fetch Data from Supabase based on user authentication
   useEffect(() => {
     const fetchData = async () => {
       if (!isSupabaseConfigured || !supabase) return;
       setIsSyncing(true);
       try {
+        // Ambil data berdasarkan RLS (Row Level Security) Supabase secara otomatis
         const [
           { data: farmsData },
           { data: blocksData },
@@ -151,26 +132,57 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           supabase.from('expenses').select('*'),
         ]);
 
-        if (farmsData && farmsData.length > 0) setFarms(farmsData);
-        if (blocksData && blocksData.length > 0) setBlocks(blocksData);
-        if (workersData && workersData.length > 0) setWorkers(workersData);
-        
-        // Mapped Harvest Transactions from Supabase snake_case to camelCase
-        if (harvestsData && harvestsData.length > 0) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if (farmsData) {
+          const mappedFarms = farmsData.map((f: any) => ({
+            id: f.id,
+            name: f.name,
+            location: f.location,
+            totalAreaHa: f.total_area_ha,
+            ownerName: f.owner_name,
+            plantedYear: f.planted_year,
+            notes: f.notes,
+            createdAt: f.created_at,
+          }));
+          setFarms(mappedFarms);
+        }
+
+        if (blocksData) {
+          const mappedBlocks = blocksData.map((b: any) => ({
+            id: b.id,
+            farmId: b.farm_id,
+            name: b.name,
+            areaHa: b.area_ha,
+            palmCount: b.palm_count,
+          }));
+          setBlocks(mappedBlocks);
+        }
+
+        if (workersData) {
+          const mappedWorkers = workersData.map((w: any) => ({
+            id: w.id,
+            name: w.name,
+            role: w.role,
+            phone: w.phone,
+            dailyWage: Number(w.daily_wage) || 0,
+            isActive: w.is_active ?? true,
+          }));
+          setWorkers(mappedWorkers);
+        }
+
+        if (harvestsData) {
           const mappedHarvests = harvestsData.map((h: any) => ({
             id: h.id,
             farmId: h.farm_id,
-            blockId: h.block_id,
-            date: h.harvest_date,
-            totalWeightKg: h.total_weight_kg,
+            blockId: h.farm_block_id,
+            date: h.date,
+            totalWeightKg: h.yield_amount,
             pricePerKg: h.price_per_kg,
             grossIncome: h.gross_income,
             driverId: h.driver_id,
             driverRatePerKg: h.driver_rate_per_kg,
             totalHarvesterWage: h.total_harvester_wage,
             transportCost: h.transport_cost,
-            buyerRamName: h.buyer_ram_name,
+            buyerRamName: h.mill_name,
             receiptNumber: h.receipt_number,
             harvesters: h.harvesters || [],
             createdAt: h.created_at,
@@ -178,17 +190,56 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           setHarvests(mappedHarvests);
         }
 
-        if (fertsData && fertsData.length > 0) setFertilizations(fertsData);
-        if (expensesData && expensesData.length > 0) setExpenses(expensesData);
+        if (fertsData) {
+          const mappedFerts = fertsData.map((f: any) => {
+            const qty = Number(f.quantity) || 0;
+            const uPrice = Number(f.unit_price || f.price_per_unit || 0);
+            const mCost = Number(f.material_cost || (qty * uPrice) || 0);
+            const lCost = Number(f.labor_cost || 0);
+            const tCost = Number(f.total_cost || (mCost + lCost) || 0);
+
+            return {
+              id: f.id,
+              farmId: f.farm_id,
+              blockId: f.block_id,
+              date: f.date,
+              fertilizerType: f.fertilizer_type || f.fertilizer_name,
+              quantity: qty,
+              unit: f.unit || 'sak (50kg)',
+              unitPrice: uPrice,
+              materialCost: mCost,
+              workerName: f.worker_name,
+              laborCost: lCost,
+              totalCost: tCost,
+              notes: f.notes,
+              createdAt: f.created_at,
+            };
+          });
+          setFertilizations(mappedFerts);
+        }
+
+        if (expensesData) {
+          const mappedExpenses = expensesData.map((e: any) => ({
+            id: e.id,
+            farmId: e.farm_id,
+            date: e.date,
+            category: e.category,
+            amount: e.amount,
+            description: e.description,
+            recipient: e.recipient,
+            createdAt: e.created_at,
+          }));
+          setExpenses(mappedExpenses);
+        }
       } catch (err) {
-        console.error('Gagal mengambil data dari Supabase, menggunakan data lokal:', err);
+        console.error('Gagal mengambil data saking Supabase:', err);
       } finally {
         setIsSyncing(false);
       }
     };
 
     fetchData();
-  }, []);
+  }, [currentUserId]);
 
   // Online status
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
@@ -204,12 +255,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   // PWA Install prompt handling
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isInstallable, setIsInstallable] = useState<boolean>(false);
 
   useEffect(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const handler = (e: any) => {
       e.preventDefault();
       setDeferredPrompt(e);
@@ -222,7 +271,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const triggerInstall = () => {
     if (deferredPrompt) {
       deferredPrompt.prompt();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       deferredPrompt.userChoice.then((choiceResult: any) => {
         if (choiceResult.outcome === 'accepted') {
           setIsInstallable(false);
@@ -325,45 +373,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, [filteredHarvests, filteredFertilizations, filteredExpenses, farms, selectedFarmId, selectedFarm]);
 
-  // --- MUTATORS ---
+  // --- MUTATORS (Kanthi user_id otomatis saking Auth) ---
 
   const addHarvest = async (item: Omit<HarvestTransaction, 'id' | 'createdAt'>) => {
-    const newEntry: HarvestTransaction = {
-      ...item,
-      id: 'harvest-' + Date.now(),
-      createdAt: new Date().toISOString(),
-    };
+    const newId = 'harvest-' + Date.now();
+    const newCreatedAt = new Date().toISOString();
+    const newEntry: HarvestTransaction = { ...item, id: newId, createdAt: newCreatedAt };
     
-    // Update state lokal terlebih dahulu agar UI langsung responsif
     setHarvests(prev => [newEntry, ...prev]);
     
     if (isSupabaseConfigured && supabase) {
+      const { data: { user } } = await supabase.auth.getUser();
       const payload = {
+        id: newId,
+        user_id: user?.id || null,
         farm_id: item.farmId || null,
-        block_id: item.blockId || null,
-        harvest_date: item.date || null,
-        total_weight_kg: Number(item.totalWeightKg) || 0,
+        farm_block_id: item.blockId || null,
+        date: item.date || null,
+        yield_amount: Number(item.totalWeightKg) || 0,
         price_per_kg: Number(item.pricePerKg) || 0,
         gross_income: Number(item.grossIncome) || 0,
         driver_id: item.driverId || null,
         driver_rate_per_kg: Number(item.driverRatePerKg) || 0,
         total_harvester_wage: Number(item.totalHarvesterWage) || 0,
         transport_cost: Number(item.transportCost) || 0,
-        buyer_ram_name: item.buyerRamName || null,
+        mill_name: item.buyerRamName || null,
         receipt_number: item.receiptNumber || null,
         harvesters: item.harvesters || [],
       };
-
-      try {
-        const { error } = await supabase.from('harvest_transactions').insert([payload]);
-        if (error) {
-          console.error('Gagal menyimpan transaksi panen ke Supabase:', error.message);
-        } else {
-          console.log('Berhasil menyimpan transaksi panen ke Supabase');
-        }
-      } catch (err) {
-        console.error('Terjadi kesalahan saat koneksi ke Supabase:', err);
-      }
+      await supabase.from('harvest_transactions').insert([payload]);
     }
   };
 
@@ -375,22 +413,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addWorker = async (worker: Omit<Worker, 'id'>) => {
-    const newWorker: Worker = {
-      ...worker,
-      id: 'worker-' + Date.now(),
-    };
+    const newId = 'worker-' + Date.now();
+    const newWorker: Worker = { ...worker, id: newId };
     setWorkers(prev => [newWorker, ...prev]);
     if (supabase) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { id, ...workerData } = worker as any;
-      await supabase.from('workers').insert([workerData]);
+      const { data: { user } } = await supabase.auth.getUser();
+      const payload = {
+        id: newId,
+        user_id: user?.id || null,
+        name: worker.name,
+        role: worker.role || null,
+        phone: worker.phone || null,
+        daily_wage: Number(worker.dailyWage) || 0,
+        is_active: worker.isActive ?? true,
+      };
+      await supabase.from('workers').insert([payload]);
     }
   };
 
   const updateWorker = async (updated: Worker) => {
     setWorkers(prev => prev.map(w => w.id === updated.id ? updated : w));
     if (supabase) {
-      await supabase.from('workers').update(updated).eq('id', updated.id);
+      const payload = {
+        name: updated.name,
+        role: updated.role,
+        phone: updated.phone,
+        daily_wage: Number(updated.dailyWage) || 0,
+        is_active: updated.isActive ?? true,
+      };
+      await supabase.from('workers').update(payload).eq('id', updated.id);
     }
   };
 
@@ -402,14 +453,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addFertilization = async (item: Omit<FertilizationRecord, 'id' | 'createdAt'>) => {
-    const newRecord: FertilizationRecord = {
-      ...item,
-      id: 'fert-' + Date.now(),
-      createdAt: new Date().toISOString(),
-    };
+    const newId = 'fert-' + Date.now();
+    const newCreatedAt = new Date().toISOString();
+    const newRecord: FertilizationRecord = { ...item, id: newId, createdAt: newCreatedAt };
     setFertilizations(prev => [newRecord, ...prev]);
-    if (supabase) {
-      await supabase.from('fertilization_records').insert([newRecord]);
+    
+    if (isSupabaseConfigured && supabase) {
+      const { data: { user } } = await supabase.auth.getUser();
+      const numQty = Number(item.quantity) || 0;
+      const numPrice = Number(item.unitPrice) || 0;
+      const matCost = Number(item.materialCost) || (numQty * numPrice);
+      const labCost = Number(item.laborCost) || 0;
+      const totCost = Number(item.totalCost) || (matCost + labCost);
+
+      const payload = {
+        id: newId,
+        user_id: user?.id || null,
+        farm_id: item.farmId || null,
+        block_id: item.blockId || null,
+        date: item.date || null,
+        fertilizer_type: item.fertilizerType || null,
+        quantity: numQty,
+        unit: item.unit || 'sak (50kg)',
+        unit_price: numPrice,
+        material_cost: matCost,
+        worker_name: item.workerName || null,
+        labor_cost: labCost,
+        total_cost: totCost,
+        notes: item.notes || null,
+      };
+      await supabase.from('fertilization_records').insert([payload]);
     }
   };
 
@@ -421,14 +494,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addExpense = async (expense: Omit<ExpenseRecord, 'id' | 'createdAt'>) => {
-    const newExpense: ExpenseRecord = {
-      ...expense,
-      id: 'exp-' + Date.now(),
-      createdAt: new Date().toISOString(),
-    };
+    const newId = 'exp-' + Date.now();
+    const newCreatedAt = new Date().toISOString();
+    const newExpense: ExpenseRecord = { ...expense, id: newId, createdAt: newCreatedAt };
     setExpenses(prev => [newExpense, ...prev]);
-    if (supabase) {
-      await supabase.from('expenses').insert([newExpense]);
+    
+    if (isSupabaseConfigured && supabase) {
+      const { data: { user } } = await supabase.auth.getUser();
+      const payload = {
+        id: newId,
+        user_id: user?.id || null,
+        farm_id: expense.farmId || null,
+        date: expense.date || null,
+        category: expense.category || null,
+        amount: Number(expense.amount) || 0,
+        description: expense.description || null,
+        recipient: expense.recipient || null,
+      };
+      await supabase.from('expenses').insert([payload]);
     }
   };
 
@@ -440,54 +523,78 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addFarm = async (farm: Omit<Farm, 'id' | 'createdAt'>) => {
-    const newFarm: Farm = {
-      ...farm,
-      id: 'farm-' + Date.now(),
-      createdAt: new Date().toISOString(),
-    };
+    const newId = 'farm-' + Date.now();
+    const newCreatedAt = new Date().toISOString();
+    const newFarm: Farm = { ...farm, id: newId, createdAt: newCreatedAt };
     setFarms(prev => [...prev, newFarm]);
     if (supabase) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { id, ...farmData } = farm as any;
-      await supabase.from('farms').insert([farmData]);
+      const { data: { user } } = await supabase.auth.getUser();
+      const payload = {
+        id: newId,
+        user_id: user?.id || null,
+        name: farm.name,
+        location: farm.location || null,
+        total_area_ha: Number(farm.totalAreaHa) || 0,
+        owner_name: farm.ownerName || null,
+        planted_year: farm.plantedYear ? Number(farm.plantedYear) : null,
+        notes: farm.notes || null,
+      };
+      await supabase.from('farms').insert([payload]);
     }
   };
 
   const updateFarm = async (id: string, updatedFields: Partial<Farm>) => {
     setFarms(prev => prev.map(f => f.id === id ? { ...f, ...updatedFields } : f));
     if (supabase) {
-      await supabase.from('farms').update(updatedFields).eq('id', id);
+      const payload: any = {};
+      if (updatedFields.name !== undefined) payload.name = updatedFields.name;
+      if (updatedFields.location !== undefined) payload.location = updatedFields.location;
+      if (updatedFields.totalAreaHa !== undefined) payload.total_area_ha = Number(updatedFields.totalAreaHa);
+      if (updatedFields.ownerName !== undefined) payload.owner_name = updatedFields.ownerName;
+      if (updatedFields.plantedYear !== undefined) payload.planted_year = updatedFields.plantedYear ? Number(updatedFields.plantedYear) : null;
+      if (updatedFields.notes !== undefined) payload.notes = updatedFields.notes;
+      
+      await supabase.from('farms').update(payload).eq('id', id);
     }
   };
 
   const deleteFarm = async (id: string) => {
     setFarms(prev => prev.filter(f => f.id !== id));
     setBlocks(prev => prev.filter(b => b.farmId !== id));
-    if (selectedFarmId === id) {
-      setSelectedFarmId('all');
-    }
+    if (selectedFarmId === id) setSelectedFarmId('all');
     if (supabase) {
       await supabase.from('farms').delete().eq('id', id);
     }
   };
 
   const addBlock = async (block: Omit<FarmBlock, 'id'>) => {
-    const newBlock: FarmBlock = {
-      ...block,
-      id: 'block-' + Date.now(),
-    };
+    const newId = 'block-' + Date.now();
+    const newBlock: FarmBlock = { ...block, id: newId };
     setBlocks(prev => [...prev, newBlock]);
     if (supabase) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { id, ...blockData } = block as any;
-      await supabase.from('farm_blocks').insert([blockData]);
+      const { data: { user } } = await supabase.auth.getUser();
+      const payload = {
+        id: newId,
+        user_id: user?.id || null,
+        farm_id: block.farmId || null,
+        name: block.name,
+        area_ha: Number(block.areaHa) || 0,
+        palm_count: Number(block.palmCount) || 0,
+      };
+      await supabase.from('farm_blocks').insert([payload]);
     }
   };
 
   const updateBlock = async (id: string, updatedFields: Partial<FarmBlock>) => {
     setBlocks(prev => prev.map(b => b.id === id ? { ...b, ...updatedFields } : b));
     if (supabase) {
-      await supabase.from('farm_blocks').update(updatedFields).eq('id', id);
+      const payload: any = {};
+      if (updatedFields.farmId !== undefined) payload.farm_id = updatedFields.farmId;
+      if (updatedFields.name !== undefined) payload.name = updatedFields.name;
+      if (updatedFields.areaHa !== undefined) payload.area_ha = Number(updatedFields.areaHa);
+      if (updatedFields.palmCount !== undefined) payload.palm_count = Number(updatedFields.palmCount);
+
+      await supabase.from('farm_blocks').update(payload).eq('id', id);
     }
   };
 

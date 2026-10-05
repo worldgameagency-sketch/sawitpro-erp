@@ -20,11 +20,11 @@ export const WorkersPage: React.FC = () => {
   const [editingWorker, setEditingWorker] = useState<Worker | null>(null);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
-  // Form State
+  // Form State (disesuaikan jadi dailyWage)
   const [name, setName] = useState('');
   const [role, setRole] = useState<WorkerRole>('pemanen');
   const [phone, setPhone] = useState('');
-  const [defaultRatePerKg, setDefaultRatePerKg] = useState('250');
+  const [dailyWage, setDailyWage] = useState('250');
   const [vehicleNumber, setVehicleNumber] = useState('');
   const [notes, setNotes] = useState('');
 
@@ -33,7 +33,7 @@ export const WorkersPage: React.FC = () => {
     setName('');
     setRole('pemanen');
     setPhone('');
-    setDefaultRatePerKg('250');
+    setDailyWage('250');
     setVehicleNumber('');
     setNotes('');
     setIsModalOpen(true);
@@ -44,7 +44,7 @@ export const WorkersPage: React.FC = () => {
     setName(w.name);
     setRole(w.role);
     setPhone(w.phone || '');
-    setDefaultRatePerKg(String(w.defaultRatePerKg || 0));
+    setDailyWage(String(w.dailyWage || 0));
     setVehicleNumber(w.vehicleNumber || '');
     setNotes(w.notes || '');
     setIsModalOpen(true);
@@ -54,7 +54,7 @@ export const WorkersPage: React.FC = () => {
     e.preventDefault();
     if (!name.trim()) return;
 
-    const rate = parseFloat(defaultRatePerKg) || 0;
+    const rate = parseFloat(dailyWage) || 0;
 
     if (editingWorker) {
       updateWorker({
@@ -62,7 +62,7 @@ export const WorkersPage: React.FC = () => {
         name: name.trim(),
         role,
         phone: phone.trim() || undefined,
-        defaultRatePerKg: rate,
+        dailyWage: rate,
         vehicleNumber: role === 'sopir' ? vehicleNumber.trim() : undefined,
         notes: notes.trim() || undefined,
       });
@@ -71,7 +71,7 @@ export const WorkersPage: React.FC = () => {
         name: name.trim(),
         role,
         phone: phone.trim() || undefined,
-        defaultRatePerKg: rate,
+        dailyWage: rate,
         vehicleNumber: role === 'sopir' ? vehicleNumber.trim() : undefined,
         isActive: true,
         notes: notes.trim() || undefined,
@@ -160,7 +160,7 @@ export const WorkersPage: React.FC = () => {
                   <div className="flex items-center justify-between bg-stone-50 p-2 rounded-xl">
                     <span className="text-stone-500">Tarif Standar:</span>
                     <span className="font-black text-stone-900">
-                      {formatRupiah(worker.defaultRatePerKg)} / kg
+                      {formatRupiah(worker.dailyWage)} / kg
                     </span>
                   </div>
 
@@ -240,13 +240,13 @@ export const WorkersPage: React.FC = () => {
             </div>
             <div>
               <label className="block text-xs font-bold text-stone-700 mb-1">
-                Tarif Dasar (/Kg)
+                Tarif Standar (/Kg)
               </label>
               <input
                 type="number"
                 placeholder="250"
-                value={defaultRatePerKg}
-                onChange={(e) => setDefaultRatePerKg(e.target.value)}
+                value={dailyWage}
+                onChange={(e) => setDailyWage(e.target.value)}
                 className="w-full bg-stone-50 border border-stone-300 rounded-xl px-3 py-2.5 text-xs font-bold"
               />
             </div>
